@@ -3815,7 +3815,7 @@ class Generator:
 
         if self._quote_json_path_key_using_brackets and self.JSON_PATH_SINGLE_QUOTE_ESCAPE:
             escaped = expression.replace("'", "\\'")
-            escaped = f"\\'{expression}\\'"
+            escaped = f"\\'{escaped}\\'"
         else:
             escaped = expression.replace('"', '\\"')
             escaped = f'"{escaped}"'

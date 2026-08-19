@@ -2,6 +2,7 @@ import json
 import os
 import unittest
 
+import sqlglot
 from sqlglot import exp
 from sqlglot.errors import ParseError, TokenError
 from sqlglot.jsonpath import parse
@@ -46,6 +47,26 @@ class TestJsonpath(unittest.TestCase):
         ):
             with self.subTest(f"{selector} -> {expected}"):
                 self.assertEqual(parse(selector).sql(), f"'{expected}'")
+
+    def test_single_quote_bracket_key_escapes_embedded_quote(self):
+        # Dialects with JSON_PATH_SINGLE_QUOTE_ESCAPE (Hive, Spark, Spark2)
+        # quote a bracketed key with single quotes, e.g. $['key']. A key
+        # containing an embedded ' must have that quote escaped in the
+        # rendered path, or the resulting SQL string literal terminates
+        # early wherever this path is embedded (e.g. GET_JSON_OBJECT(x,
+        # <path>)) -- previously json_path_part computed the escaped
+        # segment but then discarded it, interpolating the unescaped
+        # original instead.
+        path = exp.JSONPath(expressions=[exp.JSONPathRoot(), exp.JSONPathKey(this="quo'te")])
+
+        for dialect in ("hive", "spark", "spark2"):
+            with self.subTest(dialect):
+                rendered = path.sql(dialect=dialect)
+                self.assertEqual(rendered, "'$[\\'quo\\'te\\']'")
+                # The rendered path is a self-contained, valid SQL string
+                # literal: it must round-trip through the dialect's own
+                # parser on its own, not just look right as text.
+                sqlglot.parse_one(f"SELECT {rendered} AS x", dialect=dialect)
 
     def test_union_preserves_falsey_members(self):
         for selector, expected in (
